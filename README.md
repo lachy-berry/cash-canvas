@@ -1,16 +1,37 @@
-# React + Vite
+# Cash Canvas
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A family budget app for labelling bank transactions and analysing household spending.
 
-Currently, two official plugins are available:
+Import CSV exports from your bank, assign category labels to transactions, and view spending breakdowns by category. An LLM assist feature suggests labels automatically — with PII stripped before any data leaves your machine.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Tech Stack
 
-## React Compiler
+| Layer | Choice |
+|---|---|
+| Frontend | React 19, Vite 8, Tailwind CSS v4 |
+| Backend | Python 3.12, FastAPI, uvicorn |
+| Database | SQLite |
+| LLM | litellm (OpenRouter-compatible, pluggable) |
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### Frontend build tooling
 
-## Expanding the ESLint configuration
+The Vite frontend uses `@vitejs/plugin-react` which uses [Oxc](https://oxc.rs) for fast transforms. The React Compiler is not enabled. No TypeScript — plain JSX throughout.
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Repo Structure
+
+```
+cash-canvas/
+├── src/                  # React frontend
+├── server/               # FastAPI backend
+├── config/               # categories.yaml and other config
+├── tests/                # pytest tests and Playwright e2e specs
+├── .github/              # CI workflow and PR template
+└── data/                 # SQLite db (gitignored)
+```
+
+## How It's Being Developed
+
+- **AI-assisted:** Built with [OpenCode](https://opencode.ai) (coding agent) via [Kimaki](https://kimaki.dev) (Discord interface)
+- **Test-driven:** Every feature starts with a GitHub Issue for scoping, followed by failing Playwright e2e and pytest tests before any implementation
+- **CI enforced:** GitHub Actions runs the full test suite on every PR; both jobs must pass before merge
+- **Privacy-first:** Raw transaction data never leaves the machine — a server-side PII stripper runs before any LLM call
