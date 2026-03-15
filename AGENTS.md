@@ -62,13 +62,14 @@ npm run lint
 
 ## Testing Approach
 
-This project follows **acceptance-test-driven development (ATDD)**. For every feature:
+This project follows **acceptance-test-driven development (ATDD)**. The workflow for every feature is:
 
-1. Write the Playwright e2e spec first — what the user does and sees
-2. Write any relevant `pytest` tests — backend logic, edge cases, PII stripping
-3. Commit the failing tests to the feature branch
-4. Build the feature until all tests pass
-5. Open a PR — both `uv run pytest` and `npx playwright test` must be green before merge
+1. **Scope the feature** — agree on what it should do using the plan agent. Artifact the scope as a GitHub Issue.
+2. **Write the tests** — before writing any implementation code, write a Playwright e2e spec (user journey) and any relevant `pytest` tests (backend logic, edge cases, PII stripping). Commit the failing tests to the feature branch.
+3. **Build** — implement the feature until all tests pass.
+4. **PR** — open a PR referencing the GitHub Issue. Both `uv run pytest` and `npx playwright test` must be green before merge.
+
+Tests are written at the start of each feature — never speculatively ahead of time.
 
 ### Test structure
 
@@ -76,14 +77,9 @@ This project follows **acceptance-test-driven development (ATDD)**. For every fe
 tests/
 ├── fixtures/
 │   └── sample.csv              # Dummy bank export used across all tests
-├── test_pii_strip.py           # PII stripping logic (pure function)
-├── test_import_csv.py          # CSV parsing edge cases
-├── test_transactions.py        # Transaction CRUD endpoints
-├── test_categories.py          # YAML category loading
+├── test_*.py                   # pytest tests (one file per backend concern)
 └── e2e/
-    ├── import.spec.js          # CSV upload user journey
-    ├── labelling.spec.js       # Label assignment user journey
-    └── dashboard.spec.js       # Spending analysis user journey
+    └── *.spec.js               # Playwright e2e specs (one file per user journey)
 ```
 
 Playwright is configured in `playwright.config.js` to automatically start both the Vite dev server (port 5173) and FastAPI server (port 8000) before running e2e tests.
