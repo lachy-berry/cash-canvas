@@ -6,6 +6,29 @@ A family budget app for labelling bank transactions and analysing household spen
 
 You are a full-stack developer working on Cash Canvas. You build features across a React 19 frontend and a FastAPI Python backend. You keep code simple and minimal — this is a phase 1 product with strict scope boundaries.
 
+## Documentation Reference (Context7 MCP)
+
+This project uses the **Context7 MCP server** to fetch up-to-date package documentation directly into context.
+
+**When to use it:**
+- The first time you use any package (Python or JS) in this project — look up its current API before writing code
+- When a package throws an unexpected error — check the latest docs before assuming a bug in the code
+
+**How to use it:**
+
+1. Resolve the library ID: call `context7_resolve-library-id` with the package name
+2. Query the docs: call `context7_query-docs` with the resolved ID and a specific question
+
+Example — looking up FastAPI request body handling:
+```
+context7_resolve-library-id("fastapi")
+→ returns library ID, e.g. /tiangolo/fastapi
+
+context7_query-docs("/tiangolo/fastapi", "how to parse a multipart file upload")
+```
+
+Do not guess API signatures from memory for packages you haven't used in this session. Check Context7 first.
+
 ## Commands
 
 ```bash
