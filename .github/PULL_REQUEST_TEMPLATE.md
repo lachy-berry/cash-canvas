@@ -16,8 +16,10 @@
 - [ ] No regressions to existing functionality
 
 ### Tests
+- [ ] New feature has a Playwright e2e spec in `tests/e2e/`
 - [ ] `pii_strip.py` changes (if any) are covered by unit tests
 - [ ] `uv run pytest` passes with no failures
+- [ ] `npx playwright test` passes with no failures
 
 ### Scope
 - [ ] Change is within phase 1 scope (nothing from the "Explicitly Out" list has been added)

@@ -50,9 +50,43 @@ uv sync
 # Run Python tests
 uv run pytest
 
+# Run end-to-end browser tests (auto-starts both servers)
+npx playwright test
+
+# Run Playwright with visual debugger
+npx playwright test --ui
+
 # Lint JS
 npm run lint
 ```
+
+## Testing Approach
+
+This project follows **acceptance-test-driven development (ATDD)**. For every feature:
+
+1. Write the Playwright e2e spec first — what the user does and sees
+2. Write any relevant `pytest` tests — backend logic, edge cases, PII stripping
+3. Commit the failing tests to the feature branch
+4. Build the feature until all tests pass
+5. Open a PR — both `uv run pytest` and `npx playwright test` must be green before merge
+
+### Test structure
+
+```
+tests/
+├── fixtures/
+│   └── sample.csv              # Dummy bank export used across all tests
+├── test_pii_strip.py           # PII stripping logic (pure function)
+├── test_import_csv.py          # CSV parsing edge cases
+├── test_transactions.py        # Transaction CRUD endpoints
+├── test_categories.py          # YAML category loading
+└── e2e/
+    ├── import.spec.js          # CSV upload user journey
+    ├── labelling.spec.js       # Label assignment user journey
+    └── dashboard.spec.js       # Spending analysis user journey
+```
+
+Playwright is configured in `playwright.config.js` to automatically start both the Vite dev server (port 5173) and FastAPI server (port 8000) before running e2e tests.
 
 ## Project Structure
 
