@@ -10,7 +10,10 @@ import pytest
 from fastapi.testclient import TestClient
 
 from server.main import app
-from server.db import get_connection
+from server.db import get_connection, init_db
+
+# Ensure schema is created before any test fixture runs
+init_db()
 
 client = TestClient(app)
 

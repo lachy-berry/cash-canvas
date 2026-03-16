@@ -14,8 +14,20 @@ def get_connection() -> sqlite3.Connection:
 
 
 def init_db() -> None:
-    """Create tables if they don't already exist."""
+    """Create tables if they don't already exist.
+
+    Phase 1: no migration tooling. Tables are created with IF NOT EXISTS.
+    The local data/ directory is gitignored and pre-production, so if the
+    schema changes during development, delete data/cash_canvas.db and restart.
+    """
     with get_connection() as conn:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS import_batches (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                imported_at TEXT NOT NULL DEFAULT (datetime('now')),
+                row_count   INTEGER NOT NULL
+            )
+        """)
         conn.execute("""
             CREATE TABLE IF NOT EXISTS transactions (
                 id           INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -24,6 +36,8 @@ def init_db() -> None:
                 amount       REAL NOT NULL,
                 balance      REAL,
                 label_broad  TEXT,
+                fingerprint  TEXT,
+                batch_id     INTEGER REFERENCES import_batches(id),
                 imported_at  TEXT NOT NULL DEFAULT (datetime('now'))
             )
         """)
