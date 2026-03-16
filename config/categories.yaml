@@ -1,0 +1,21 @@
+version: 1
+layers:
+  - id: broad
+    name: Broad Category
+    categories:
+      - id: groceries
+        name: Groceries
+      - id: dining
+        name: Dining Out
+      - id: transport
+        name: Transport
+      - id: utilities
+        name: Utilities
+      - id: health
+        name: Health
+      - id: entertainment
+        name: Entertainment
+      - id: income
+        name: Income
+      - id: other
+        name: Other
