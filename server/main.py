@@ -1,5 +1,4 @@
 """FastAPI application entry point."""
-import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -37,10 +36,7 @@ def get_categories() -> dict:
 
 @app.delete("/api/test/reset")
 def test_reset() -> dict:
-    """Wipe all transactions and batches. Only available outside CI."""
-    if os.getenv("CI"):
-        from fastapi import HTTPException
-        raise HTTPException(status_code=403, detail="Not available in CI.")
+    """Wipe all transactions and batches. Used for e2e test isolation."""
     with get_connection() as conn:
         conn.execute("DELETE FROM transactions")
         conn.execute("DELETE FROM import_batches")
