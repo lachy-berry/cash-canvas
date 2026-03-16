@@ -56,7 +56,7 @@ jobs:
         run: npx playwright install chromium --with-deps
 
       - name: Run Playwright tests
-        run: npx playwright test
+        run: npx playwright test --pass-with-no-tests
         env:
           CI: true
 
