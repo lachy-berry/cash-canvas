@@ -31,7 +31,7 @@ cash-canvas/
 
 ## How It's Being Developed
 
-- **AI-assisted:** Built with [OpenCode](https://opencode.ai) (coding agent) via [Kimaki](https://kimaki.dev) (Discord interface)
+- **AI-assisted:** Built with [OpenCode](https://opencode.ai) (coding agent) via [Kimaki](https://kimaki.xyz) (Discord interface)
 - **Test-driven:** Every feature starts with a GitHub Issue for scoping, followed by failing Playwright e2e and pytest tests before any implementation
 - **CI enforced:** GitHub Actions runs the full test suite on every PR; both jobs must pass before merge
 - **Privacy-first:** Raw transaction data never leaves the machine — a server-side PII stripper runs before any LLM call
