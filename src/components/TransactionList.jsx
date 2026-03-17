@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
+import { getFetchErrorMessage } from './fetchError'
 
 const PAGE_SIZE = 50
 
@@ -24,7 +25,7 @@ export function TransactionList({ refreshKey = 0 }) {
     async function loadTransactions() {
       try {
         const res = await fetch(`/api/transactions?limit=${PAGE_SIZE}&offset=${offset}`)
-        if (!res.ok) throw new Error(`Server error ${res.status}`)
+        if (!res.ok) throw new Error(await getFetchErrorMessage(res))
         const data = await res.json()
         if (!cancelled) {
           setTransactions(data.transactions)

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router'
+import { getFetchErrorMessage } from '../fetchError'
 
 /**
  * Step 4 — Import complete with undo option.
@@ -21,8 +22,7 @@ export function StepDone({ imported, skipped, batchId }) {
     try {
       const res = await fetch(`/api/import/batches/${batchId}`, { method: 'DELETE' })
       if (!res.ok) {
-        const d = await res.json()
-        throw new Error(d.detail ?? 'Undo failed.')
+        throw new Error(await getFetchErrorMessage(res))
       }
       setUndone(true)
     } catch (err) {
