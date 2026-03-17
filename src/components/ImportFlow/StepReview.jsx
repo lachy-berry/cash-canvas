@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react'
-import { getFetchErrorMessage } from '../fetchError'
 
 const PREVIEW_LIMIT = 20
 
@@ -34,7 +33,8 @@ export function StepReview({ file, mapping, onConfirm, onBack }) {
 
         const res = await fetch('/api/import/preview', { method: 'POST', body: formData })
         if (!res.ok) {
-          throw new Error(await getFetchErrorMessage(res))
+          const d = await res.json()
+          throw new Error(d.detail ?? 'Preview failed.')
         }
         
         const data = await res.json()

@@ -3,7 +3,6 @@ import { StepUpload } from './StepUpload'
 import { StepMapColumns } from './StepMapColumns'
 import { StepReview } from './StepReview'
 import { StepDone } from './StepDone'
-import { getFetchErrorMessage } from '../fetchError'
 
 const STEPS = ['upload', 'map', 'review', 'done']
 
@@ -34,8 +33,8 @@ export function ImportFlow() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ rows, skipped }),
     })
-    if (!res.ok) throw new Error(await getFetchErrorMessage(res))
     const data = await res.json()
+    if (!res.ok) throw new Error(data.detail ?? 'Confirm failed.')
     setResult({ imported: data.imported, skipped: data.skipped, batchId: data.batch_id })
     setStep('done')
   }
