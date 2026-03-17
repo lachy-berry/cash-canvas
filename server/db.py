@@ -23,9 +23,10 @@ def init_db() -> None:
     with get_connection() as conn:
         conn.execute("""
             CREATE TABLE IF NOT EXISTS import_batches (
-                id          INTEGER PRIMARY KEY AUTOINCREMENT,
-                imported_at TEXT NOT NULL DEFAULT (datetime('now')),
-                row_count   INTEGER NOT NULL
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                imported_at  TEXT NOT NULL DEFAULT (datetime('now')),
+                row_count    INTEGER NOT NULL,
+                skipped      INTEGER NOT NULL DEFAULT 0
             )
         """)
         conn.execute("""

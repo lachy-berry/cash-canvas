@@ -165,16 +165,25 @@ class TestImportConfirm:
         res = post_confirm(rows)
         assert res.status_code == 200
 
-    def test_response_has_batch_id_and_imported(self):
+    def test_response_has_batch_id_imported_skipped(self):
         rows = post_preview().json()["new"]
         data = post_confirm(rows).json()
         assert "batch_id" in data
         assert "imported" in data
+        assert "skipped" in data
 
     def test_imported_count_matches_rows(self):
         rows = post_preview().json()["new"]
         data = post_confirm(rows).json()
         assert data["imported"] == 3
+        assert data["skipped"] == 0
+
+    def test_skipped_echoed_from_request(self):
+        """skipped is sent by the client and echoed back in the response."""
+        rows = post_preview().json()["new"]
+        res = client.post("/api/import/confirm", json={"rows": rows, "skipped": 4})
+        assert res.status_code == 200
+        assert res.json()["skipped"] == 4
 
     def test_rows_persisted_to_db(self):
         rows = post_preview().json()["new"]

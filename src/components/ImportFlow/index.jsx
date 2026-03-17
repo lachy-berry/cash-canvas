@@ -31,12 +31,11 @@ export function ImportFlow() {
     const res = await fetch('/api/import/confirm', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ rows }),
+      body: JSON.stringify({ rows, skipped: skippedDups }),
     })
     const data = await res.json()
     if (!res.ok) throw new Error(data.detail ?? 'Confirm failed.')
-    // skippedDups is computed client-side: total duplicates minus those explicitly included
-    setResult({ imported: data.imported, skipped: skippedDups, batchId: data.batch_id })
+    setResult({ imported: data.imported, skipped: data.skipped, batchId: data.batch_id })
     setStep('done')
   }
 

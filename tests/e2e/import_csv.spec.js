@@ -153,6 +153,27 @@ test.describe('CSV Import', () => {
     await expect(page.getByText(/no transactions/i)).toBeVisible({ timeout: 5000 })
   })
 
+  test('skipped count shown on Step 4 when duplicates were not included', async ({ page, request }) => {
+    // Seed all 10 rows via API first so second import sees them all as duplicates
+    await seedImport(request)
+
+    // Import the same file via UI — all 10 will be duplicates
+    // Include only the first one, skip the other 9
+    await page.goto('/import')
+    await uploadAndWaitForMapping(page, SAMPLE_CSV)
+    await proceedToReview(page)
+
+    // Click "+ Include anyway" only on the first duplicate row
+    const includeButtons = page.getByRole('button', { name: /include anyway/i })
+    await includeButtons.first().click()
+
+    // Import: 1 included, 9 skipped
+    await page.getByRole('button', { name: /Import 1 transaction/i }).click()
+
+    // Step 4 should report the correct skipped count
+    await expect(page.getByText(/9 duplicate/i)).toBeVisible({ timeout: 10000 })
+  })
+
   test('CSV with no recognisable columns shows unmapped dropdowns', async ({ page }) => {
     await page.goto('/import')
     await page.locator('input[type="file"]').setInputFiles({

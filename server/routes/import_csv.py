@@ -185,6 +185,7 @@ class TransactionRow(BaseModel):
 
 class ConfirmRequest(BaseModel):
     rows: list[TransactionRow]
+    skipped: int = 0  # number of detected duplicates the user chose not to include
 
 
 @router.post("/api/import/confirm")
@@ -194,15 +195,15 @@ def confirm_import(body: ConfirmRequest) -> dict:
     Fingerprints are recomputed server-side from canonical field values —
     client-supplied fingerprints are ignored.
 
-    Returns batch_id and imported count.
+    Returns batch_id, imported count, and skipped count.
     """
     if not body.rows:
         raise HTTPException(status_code=422, detail="No rows to import.")
 
     with get_connection() as conn:
         cur = conn.execute(
-            "INSERT INTO import_batches (row_count) VALUES (?)",
-            (len(body.rows),),
+            "INSERT INTO import_batches (row_count, skipped) VALUES (?, ?)",
+            (len(body.rows), body.skipped),
         )
         batch_id = cur.lastrowid
 
@@ -226,7 +227,7 @@ def confirm_import(body: ConfirmRequest) -> dict:
         )
         conn.commit()
 
-    return {"batch_id": batch_id, "imported": len(body.rows)}
+    return {"batch_id": batch_id, "imported": len(body.rows), "skipped": body.skipped}
 
 
 # ---------------------------------------------------------------------------
