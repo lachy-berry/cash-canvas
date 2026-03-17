@@ -17,52 +17,58 @@ export function StepReview({ file, mapping, onConfirm, onBack }) {
   const [error, setError] = useState(null)
   const [newRows, setNewRows] = useState([])
   const [duplicates, setDuplicates] = useState([])
-  // Track which duplicates the user wants to include anyway
-  const [includedDups, setIncludedDups] = useState(new Set())
+  // Track which duplicate rows (by index) the user wants to include anyway
+  const [includedDupIndices, setIncludedDupIndices] = useState(new Set())
 
   useEffect(() => {
     let cancelled = false
-    setLoading(true)
-    setError(null)
 
-    const formData = new FormData()
-    formData.append('file', file)
-    Object.entries(mapping).forEach(([k, v]) => {
-      if (v != null) formData.append(k, v)
-    })
+    async function loadPreview() {
+      try {
+        const formData = new FormData()
+        formData.append('file', file)
+        Object.entries(mapping).forEach(([k, v]) => {
+          if (v != null) formData.append(k, v)
+        })
 
-    fetch('/api/import/preview', { method: 'POST', body: formData })
-      .then(res => {
-        if (!res.ok) return res.json().then(d => Promise.reject(d.detail ?? 'Preview failed.'))
-        return res.json()
-      })
-      .then(data => {
+        const res = await fetch('/api/import/preview', { method: 'POST', body: formData })
+        if (!res.ok) {
+          const d = await res.json()
+          throw new Error(d.detail ?? 'Preview failed.')
+        }
+        
+        const data = await res.json()
         if (!cancelled) {
           setNewRows(data.new ?? [])
           setDuplicates(data.duplicates ?? [])
         }
-      })
-      .catch(err => { if (!cancelled) setError(String(err)) })
-      .finally(() => { if (!cancelled) setLoading(false) })
+      } catch (err) {
+        if (!cancelled) setError(String(err))
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+
+    loadPreview()
 
     return () => { cancelled = true }
   }, [file, mapping])
 
-  function toggleDup(fingerprint) {
-    setIncludedDups(prev => {
+  function toggleDup(index) {
+    setIncludedDupIndices(prev => {
       const next = new Set(prev)
-      if (next.has(fingerprint)) next.delete(fingerprint)
-      else next.add(fingerprint)
+      if (next.has(index)) next.delete(index)
+      else next.add(index)
       return next
     })
   }
 
   function handleImport() {
-    const chosenDups = duplicates.filter(r => includedDups.has(r.fingerprint))
-    onConfirm([...newRows, ...chosenDups])
+    const chosenDups = duplicates.filter((_, i) => includedDupIndices.has(i))
+    onConfirm([...newRows, ...chosenDups], duplicates.length - includedDupIndices.size)
   }
 
-  const totalToImport = newRows.length + includedDups.size
+  const totalToImport = newRows.length + includedDupIndices.size
 
   if (loading) return <p className="text-sm text-gray-500">Analysing file…</p>
   if (error) return (
@@ -126,8 +132,8 @@ export function StepReview({ file, mapping, onConfirm, onBack }) {
             {duplicates.length} possible duplicate{duplicates.length !== 1 ? 's' : ''}
           </h3>
           <div className="overflow-y-auto max-h-64 rounded-lg border border-amber-200 bg-amber-50">
-            {duplicates.map((row) => (
-              <div key={row.fingerprint} className="flex items-center justify-between gap-3 px-3 py-2 border-b border-amber-100 last:border-0">
+            {duplicates.map((row, i) => (
+              <div key={i} className="flex items-center justify-between gap-3 px-3 py-2 border-b border-amber-100 last:border-0">
                 <div className="flex-1 min-w-0">
                   <span className="text-xs text-gray-500 mr-2">{row.date}</span>
                   <span className="text-sm text-gray-800 truncate">{row.description}</span>
@@ -136,14 +142,14 @@ export function StepReview({ file, mapping, onConfirm, onBack }) {
                   {row.amount < 0 ? '-' : '+'}${Math.abs(row.amount).toFixed(2)}
                 </span>
                 <button
-                  onClick={() => toggleDup(row.fingerprint)}
+                  onClick={() => toggleDup(i)}
                   className={`shrink-0 text-xs px-2 py-1 rounded border transition-colors ${
-                    includedDups.has(row.fingerprint)
+                    includedDupIndices.has(i)
                       ? 'bg-indigo-600 text-white border-indigo-600'
                       : 'text-indigo-600 border-indigo-300 hover:bg-indigo-50'
                   }`}
                 >
-                  {includedDups.has(row.fingerprint) ? '✓ Included' : '+ Include anyway'}
+                  {includedDupIndices.has(i) ? '✓ Included' : '+ Include anyway'}
                 </button>
               </div>
             ))}

@@ -176,16 +176,25 @@ async def preview_import(
 # POST /api/import/confirm
 # ---------------------------------------------------------------------------
 
+class TransactionRow(BaseModel):
+    date: str
+    description: str
+    amount: float
+    balance: float | None = None
+
+
 class ConfirmRequest(BaseModel):
-    rows: list[dict]
+    rows: list[TransactionRow]
 
 
 @router.post("/api/import/confirm")
 def confirm_import(body: ConfirmRequest) -> dict:
     """Write approved rows to the database as a new import batch.
 
-    Returns batch_id, imported count, and skipped count (always 0 here —
-    skipping is done client-side before calling confirm).
+    Fingerprints are recomputed server-side from canonical field values —
+    client-supplied fingerprints are ignored.
+
+    Returns batch_id and imported count.
     """
     if not body.rows:
         raise HTTPException(status_code=422, detail="No rows to import.")
@@ -197,16 +206,27 @@ def confirm_import(body: ConfirmRequest) -> dict:
         )
         batch_id = cur.lastrowid
 
+        params = [
+            {
+                "date": row.date,
+                "description": row.description,
+                "amount": row.amount,
+                "balance": row.balance,
+                "fingerprint": _compute_fingerprint(row.date, row.description, row.amount, row.balance),
+                "batch_id": batch_id,
+            }
+            for row in body.rows
+        ]
         conn.executemany(
             """
             INSERT INTO transactions (date, description, amount, balance, fingerprint, batch_id)
             VALUES (:date, :description, :amount, :balance, :fingerprint, :batch_id)
             """,
-            [{**row, "batch_id": batch_id} for row in body.rows],
+            params,
         )
         conn.commit()
 
-    return {"batch_id": batch_id, "imported": len(body.rows), "skipped": 0}
+    return {"batch_id": batch_id, "imported": len(body.rows)}
 
 
 # ---------------------------------------------------------------------------

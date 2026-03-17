@@ -1,6 +1,7 @@
 """FastAPI application entry point."""
+import os
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from server.db import init_db, get_connection
@@ -36,7 +37,9 @@ def get_categories() -> dict:
 
 @app.delete("/api/test/reset")
 def test_reset() -> dict:
-    """Wipe all transactions and batches. Used for e2e test isolation."""
+    """Wipe all transactions and batches. Only available when CASH_CANVAS_TEST_MODE=1."""
+    if os.environ.get("CASH_CANVAS_TEST_MODE") != "1":
+        raise HTTPException(status_code=403, detail="Test reset is not enabled.")
     with get_connection() as conn:
         conn.execute("DELETE FROM transactions")
         conn.execute("DELETE FROM import_batches")

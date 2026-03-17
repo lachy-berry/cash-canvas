@@ -4,8 +4,10 @@ Tests for the CSV import endpoints:
   POST /api/import/confirm
   DELETE /api/import/batches/{batch_id}
   GET /api/transactions
+  DELETE /api/test/reset (env-gated)
 """
 import io
+import os
 import pytest
 from fastapi.testclient import TestClient
 
@@ -163,18 +165,16 @@ class TestImportConfirm:
         res = post_confirm(rows)
         assert res.status_code == 200
 
-    def test_response_has_batch_id_imported_skipped(self):
+    def test_response_has_batch_id_and_imported(self):
         rows = post_preview().json()["new"]
         data = post_confirm(rows).json()
         assert "batch_id" in data
         assert "imported" in data
-        assert "skipped" in data
 
     def test_imported_count_matches_rows(self):
         rows = post_preview().json()["new"]
         data = post_confirm(rows).json()
         assert data["imported"] == 3
-        assert data["skipped"] == 0
 
     def test_rows_persisted_to_db(self):
         rows = post_preview().json()["new"]
@@ -331,3 +331,106 @@ class TestListTransactions:
         self._import()
         data = client.get("/api/transactions?limit=1&offset=0").json()
         assert data["total"] == 3
+
+
+# ---------------------------------------------------------------------------
+# Per-row duplicate inclusion with colliding fingerprints
+# ---------------------------------------------------------------------------
+
+class TestDuplicatePerRowInclusion:
+    """Ensure each duplicate row can be independently included even when
+    two rows share the same fingerprint (identical date, description, amount, balance)."""
+
+    IDENTICAL_CSV = (
+        b"Date,Description,Amount,Balance\n"
+        b"2026-03-01,NETFLIX.COM,-22.99,500.00\n"
+        b"2026-03-01,NETFLIX.COM,-22.99,500.00\n"  # exact duplicate of row 1
+    )
+
+    def test_two_identical_rows_both_appear_as_duplicates_after_first_import(self):
+        """After importing once, a second preview of the same file should show
+        both rows as duplicates — even though they share a fingerprint."""
+        # First import via confirm directly using known good rows
+        mapping = {
+            "date_col": "Date",
+            "desc_col": "Description",
+            "amount_col": "Amount",
+            "balance_col": "Balance",
+        }
+        preview1 = post_preview(self.IDENTICAL_CSV, mapping).json()
+        # On first preview the first row is new; the second shares the same fingerprint
+        # so it shows as a duplicate immediately (within the same file, against DB)
+        # After confirming all new rows, re-preview should show both as duplicates.
+        post_confirm(preview1["new"])
+
+        preview2 = post_preview(self.IDENTICAL_CSV, mapping).json()
+        assert len(preview2["duplicates"]) == 2, (
+            "Both rows must appear as duplicates, even if fingerprints collide"
+        )
+        assert preview2["new"] == []
+
+    def test_confirm_accepts_multiple_rows_with_same_fingerprint(self):
+        """Confirming two rows with the same fingerprint (user chose to include both)
+        should persist both rows to the database."""
+        rows = [
+            {"date": "2026-03-01", "description": "NETFLIX.COM", "amount": -22.99, "balance": 500.00},
+            {"date": "2026-03-01", "description": "NETFLIX.COM", "amount": -22.99, "balance": 500.00},
+        ]
+        res = post_confirm(rows)
+        assert res.status_code == 200
+        assert res.json()["imported"] == 2
+
+        with get_connection() as conn:
+            count = conn.execute(
+                "SELECT COUNT(*) FROM transactions WHERE description = 'NETFLIX.COM'"
+            ).fetchone()[0]
+        assert count == 2
+
+
+# ---------------------------------------------------------------------------
+# Fingerprint recomputed server-side (client value ignored)
+# ---------------------------------------------------------------------------
+
+class TestServerSideFingerprint:
+    def test_fingerprint_in_db_matches_server_computation(self):
+        """The fingerprint stored in the DB must be computed from canonical row values,
+        not copied from any client-supplied value."""
+        import hashlib
+
+        rows = [{"date": "2026-01-01", "description": "TEST", "amount": -10.00, "balance": None}]
+        post_confirm(rows)
+
+        with get_connection() as conn:
+            row = conn.execute("SELECT fingerprint FROM transactions").fetchone()
+
+        expected = hashlib.sha256("2026-01-01|TEST|-10.0".encode()).hexdigest()
+        assert row["fingerprint"] == expected
+
+
+# ---------------------------------------------------------------------------
+# DELETE /api/test/reset — env-gated
+# ---------------------------------------------------------------------------
+
+class TestResetEndpoint:
+    def test_reset_blocked_without_env_flag(self, monkeypatch):
+        """The reset endpoint must return 403 when CASH_CANVAS_TEST_MODE is not set."""
+        monkeypatch.delenv("CASH_CANVAS_TEST_MODE", raising=False)
+        res = client.delete("/api/test/reset")
+        assert res.status_code == 403
+
+    def test_reset_allowed_with_env_flag(self, monkeypatch):
+        """The reset endpoint must succeed when CASH_CANVAS_TEST_MODE=1."""
+        monkeypatch.setenv("CASH_CANVAS_TEST_MODE", "1")
+        # Seed a row so we can verify it's wiped
+        rows = post_preview().json()["new"]
+        post_confirm(rows)
+        with get_connection() as conn:
+            count_before = conn.execute("SELECT COUNT(*) FROM transactions").fetchone()[0]
+        assert count_before > 0
+
+        res = client.delete("/api/test/reset")
+        assert res.status_code == 200
+
+        with get_connection() as conn:
+            count_after = conn.execute("SELECT COUNT(*) FROM transactions").fetchone()[0]
+        assert count_after == 0

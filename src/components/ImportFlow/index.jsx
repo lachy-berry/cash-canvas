@@ -27,21 +27,17 @@ export function ImportFlow() {
     setStep('review')
   }
 
-  async function handleConfirm(rows) {
-    try {
-      const res = await fetch('/api/import/confirm', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rows }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.detail ?? 'Confirm failed.')
-      setResult({ imported: data.imported, skipped: data.skipped, batchId: data.batch_id })
-      setStep('done')
-    } catch (err) {
-      // Surface the error inside StepReview by re-throwing
-      throw err
-    }
+  async function handleConfirm(rows, skippedDups = 0) {
+    const res = await fetch('/api/import/confirm', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rows }),
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.detail ?? 'Confirm failed.')
+    // skippedDups is computed client-side: total duplicates minus those explicitly included
+    setResult({ imported: data.imported, skipped: skippedDups, batchId: data.batch_id })
+    setStep('done')
   }
 
   return (
@@ -49,7 +45,6 @@ export function ImportFlow() {
       {/* Step indicator */}
       <div className="flex items-center gap-2 mb-8 text-xs text-gray-400">
         {['Upload', 'Map columns', 'Review', 'Done'].map((label, i) => {
-          const stepKey = STEPS[i]
           const current = STEPS.indexOf(step)
           const isActive = i === current
           const isDone = i < current

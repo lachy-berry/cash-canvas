@@ -27,7 +27,7 @@ export default defineConfig({
   // Automatically start both servers before running tests
   webServer: [
     {
-      command: 'uv run uvicorn server.main:app --port 8000',
+      command: 'CASH_CANVAS_TEST_MODE=1 uv run uvicorn server.main:app --port 8000',
       port: 8000,
       reuseExistingServer: !process.env.CI,
       timeout: 15000,
