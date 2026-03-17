@@ -11,5 +11,8 @@ export default defineConfig({
   server: {
     host: true,
     allowedHosts: ['nicol-civilizational-quiana.ngrok-free.dev'],
+    proxy: {
+      '/api': 'http://localhost:8000',
+    },
   },
 })
