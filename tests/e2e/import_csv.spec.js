@@ -61,6 +61,17 @@ async function proceedToReview(page) {
   await page.locator('p').filter({ hasText: /ready to import/i }).waitFor({ timeout: 10000 })
 }
 
+async function goToImportReview(page, filePath = SAMPLE_CSV) {
+  await page.goto('/import')
+  await uploadAndWaitForMapping(page, filePath)
+  await proceedToReview(page)
+}
+
+async function importFromReview(page, expectedButtonRegex = /Import .* transaction/i) {
+  await page.getByRole('button', { name: expectedButtonRegex }).click()
+  await expect(page.getByText(/Imported .* transaction/i)).toBeVisible({ timeout: 10000 })
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -91,21 +102,15 @@ test.describe('CSV Import', () => {
   })
 
   test('importing shows success with "Imported 10 transactions"', async ({ page }) => {
-    await page.goto('/import')
-    await uploadAndWaitForMapping(page, SAMPLE_CSV)
-    await proceedToReview(page)
-
+    await goToImportReview(page)
     // Click the Import button (text is "Import 10 transactions")
     await page.getByRole('button', { name: /Import 10 transaction/i }).click()
     await expect(page.getByText(/Imported 10 transactions/i)).toBeVisible({ timeout: 10000 })
   })
 
   test('after import, clicking "View transactions" shows WOOLWORTHS in the list', async ({ page }) => {
-    await page.goto('/import')
-    await uploadAndWaitForMapping(page, SAMPLE_CSV)
-    await proceedToReview(page)
-    await page.getByRole('button', { name: /Import 10 transaction/i }).click()
-    await expect(page.getByText(/Imported 10 transactions/i)).toBeVisible({ timeout: 10000 })
+    await goToImportReview(page)
+    await importFromReview(page, /Import 10 transaction/i)
 
     await page.getByRole('link', { name: /view transactions/i }).click()
     await expect(page).toHaveURL('/')
@@ -117,19 +122,14 @@ test.describe('CSV Import', () => {
     await seedImport(request)
 
     // Go through the UI for the second import
-    await page.goto('/import')
-    await uploadAndWaitForMapping(page, SAMPLE_CSV)
-    await proceedToReview(page)
+    await goToImportReview(page)
 
     await expect(page.getByRole('heading', { name: /10 possible duplicate/i })).toBeVisible({ timeout: 5000 })
   })
 
   test('undo button removes the batch and transaction list returns to 0', async ({ page }) => {
-    await page.goto('/import')
-    await uploadAndWaitForMapping(page, SAMPLE_CSV)
-    await proceedToReview(page)
-    await page.getByRole('button', { name: /Import 10 transaction/i }).click()
-    await expect(page.getByText(/Imported 10 transactions/i)).toBeVisible({ timeout: 10000 })
+    await goToImportReview(page)
+    await importFromReview(page, /Import 10 transaction/i)
 
     // Undo
     await page.getByRole('button', { name: /undo this import/i }).click()
@@ -146,16 +146,14 @@ test.describe('CSV Import', () => {
 
     // Import the same file via UI — all 10 will be duplicates
     // Include only the first one, skip the other 9
-    await page.goto('/import')
-    await uploadAndWaitForMapping(page, SAMPLE_CSV)
-    await proceedToReview(page)
+    await goToImportReview(page)
 
     // Click "+ Include anyway" only on the first duplicate row
     const includeButtons = page.getByRole('button', { name: /include anyway/i })
     await includeButtons.first().click()
 
     // Import: 1 included, 9 skipped
-    await page.getByRole('button', { name: /Import 1 transaction/i }).click()
+    await importFromReview(page, /Import 1 transaction/i)
 
     // Step 4 should report the correct skipped count
     await expect(page.getByText(/9 duplicate/i)).toBeVisible({ timeout: 10000 })

@@ -1,5 +1,7 @@
 """Shared fixtures and helpers for all pytest tests."""
 import io
+from pathlib import Path
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -10,11 +12,8 @@ init_db()
 
 client = TestClient(app)
 
-SAMPLE_CSV = b"""Date,Description,Amount,Balance
-2026-03-01,WOOLWORTHS SUPERMARKETS SYDNEY NSW,-82.50,4217.50
-2026-03-02,EFTPOS COLES EXPRESS NEWTOWN NSW,-45.00,4172.50
-2026-03-03,DIRECT CREDIT EMPLOYER PTY LTD SALARY,5200.00,9372.50
-"""
+_sample_lines = (Path(__file__).parent / "fixtures" / "sample.csv").read_text().splitlines()
+SAMPLE_CSV = ("\n".join(_sample_lines[:4]) + "\n").encode()
 
 SAMPLE_MAPPING = {
     "date_col": "Date",
@@ -35,6 +34,17 @@ def post_preview(csv_bytes: bytes = SAMPLE_CSV, mapping: dict | None = None):
 
 def post_confirm(rows: list, skipped: int = 0):
     return client.post("/api/import/confirm", json={"rows": rows, "skipped": skipped})
+
+
+def make_row(**overrides):
+    row = {
+        "date": "2026-01-01",
+        "description": "TEST TXN",
+        "amount": -10.0,
+        "balance": None,
+    }
+    row.update(overrides)
+    return row
 
 
 def _wipe_db():

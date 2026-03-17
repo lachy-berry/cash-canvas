@@ -4,7 +4,7 @@ import hashlib
 import pytest
 
 from server.db import get_connection
-from tests.conftest import client, post_preview, post_confirm
+from tests.conftest import client, make_row, post_preview, post_confirm
 
 
 def _new_rows():
@@ -30,7 +30,7 @@ class TestConfirm:
 
     def test_fingerprint_computed_server_side(self):
         """Fingerprint in DB must match server computation, not any client value."""
-        post_confirm([{"date": "2026-01-01", "description": "TEST", "amount": -10.0, "balance": None}])
+        post_confirm([make_row(description="TEST")])
         expected = hashlib.sha256("2026-01-01|TEST|-10.0".encode()).hexdigest()
         with get_connection() as conn:
             row = conn.execute("SELECT fingerprint FROM transactions WHERE description='TEST'").fetchone()
@@ -39,7 +39,10 @@ class TestConfirm:
     def test_skipped_echoed_and_validated(self):
         """skipped is returned as provided; negative value is rejected."""
         assert post_confirm(_new_rows(), skipped=4).json()["skipped"] == 4
-        assert client.post("/api/import/confirm", json={"rows": _new_rows(), "skipped": -1}).status_code == 422
+        assert client.post(
+            "/api/import/confirm",
+            json={"rows": [make_row(description="SKIP VALIDATION")], "skipped": -1},
+        ).status_code == 422
 
     def test_duplicate_rows_included_when_confirmed(self):
         """User can force-include duplicates — both original and re-confirmed rows persist."""
