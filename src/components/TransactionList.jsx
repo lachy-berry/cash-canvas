@@ -20,25 +20,27 @@ export function TransactionList({ refreshKey = 0 }) {
 
   useEffect(() => {
     let cancelled = false
-    setLoading(true)
-    setError(null)
 
-    fetch(`/api/transactions?limit=${PAGE_SIZE}&offset=${offset}`)
-      .then(res => {
+    async function loadTransactions() {
+      try {
+        const res = await fetch(`/api/transactions?limit=${PAGE_SIZE}&offset=${offset}`)
         if (!res.ok) throw new Error(`Server error ${res.status}`)
-        return res.json()
-      })
-      .then(data => {
+        const data = await res.json()
         if (!cancelled) {
           setTransactions(data.transactions)
           setTotal(data.total)
         }
-      })
-      .catch(err => { if (!cancelled) setError(err.message) })
-      .finally(() => { if (!cancelled) setLoading(false) })
+      } catch (err) {
+        if (!cancelled) setError(err.message)
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+
+    loadTransactions()
 
     return () => { cancelled = true }
-  }, [page, refreshKey])
+  }, [page, offset, refreshKey])
 
   const totalPages = Math.ceil(total / PAGE_SIZE)
 

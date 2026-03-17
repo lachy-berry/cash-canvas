@@ -65,7 +65,10 @@ export function StepReview({ file, mapping, onConfirm, onBack }) {
 
   function handleImport() {
     const chosenDups = duplicates.filter((_, i) => includedDupIndices.has(i))
-    onConfirm([...newRows, ...chosenDups], duplicates.length - includedDupIndices.size)
+    onConfirm({
+      rows: [...newRows, ...chosenDups],
+      skipped: duplicates.length - includedDupIndices.size,
+    })
   }
 
   const totalToImport = newRows.length + includedDupIndices.size

@@ -103,7 +103,7 @@ export function StepMapColumns({ headers, onNext }) {
         </Field>
 
         <Field label="Balance" hint="optional">
-          <ColSelect value={balanceCol} onChange={setBalanceCol} headers={headers} allowEmpty />
+          <ColSelect value={balanceCol} onChange={setBalanceCol} headers={headers} />
         </Field>
       </div>
 
@@ -136,7 +136,7 @@ function Field({ label, required, hint, children }) {
   )
 }
 
-function ColSelect({ value, onChange, headers, placeholder = 'Select column…', allowEmpty = false }) {
+function ColSelect({ value, onChange, headers, placeholder = 'Select column…' }) {
   return (
     <select
       value={value}

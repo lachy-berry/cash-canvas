@@ -27,11 +27,11 @@ export function ImportFlow() {
     setStep('review')
   }
 
-  async function handleConfirm(rows, skippedDups = 0) {
+  async function handleConfirm({ rows, skipped = 0 }) {
     const res = await fetch('/api/import/confirm', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ rows, skipped: skippedDups }),
+      body: JSON.stringify({ rows, skipped }),
     })
     const data = await res.json()
     if (!res.ok) throw new Error(data.detail ?? 'Confirm failed.')

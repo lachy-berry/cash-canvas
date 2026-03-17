@@ -4,7 +4,42 @@ from pathlib import Path
 
 _DB_PATH = Path(__file__).parent.parent / "data" / "cash_canvas.db"
 
-# Expected columns per table. Used by _check_schema() to detect stale DBs.
+# ---------------------------------------------------------------------------
+# Single source of truth for the schema.
+# Order matters: import_batches must precede transactions (FK dependency).
+# ---------------------------------------------------------------------------
+_SCHEMA: list[tuple[str, str]] = [
+    (
+        "import_batches",
+        """
+        CREATE TABLE import_batches (
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            imported_at  TEXT NOT NULL DEFAULT (datetime('now')),
+            row_count    INTEGER NOT NULL,
+            skipped      INTEGER NOT NULL DEFAULT 0
+        )
+        """,
+    ),
+    (
+        "transactions",
+        """
+        CREATE TABLE transactions (
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            date         TEXT NOT NULL,
+            description  TEXT NOT NULL,
+            amount       REAL NOT NULL,
+            balance      REAL,
+            label_broad  TEXT,
+            fingerprint  TEXT,
+            batch_id     INTEGER REFERENCES import_batches(id),
+            imported_at  TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+        """,
+    ),
+]
+
+# Expected columns per table — kept in sync with _SCHEMA manually.
+# Used by _schema_is_current() to detect stale DBs at startup.
 _EXPECTED_COLUMNS: dict[str, set[str]] = {
     "import_batches": {"id", "imported_at", "row_count", "skipped"},
     "transactions": {
@@ -29,13 +64,10 @@ def _table_columns(conn: sqlite3.Connection, table: str) -> set[str]:
 
 
 def _schema_is_current(conn: sqlite3.Connection) -> bool:
-    """Return True if all tables exist with the correct columns."""
+    """Return True if all tables exist with at least the expected columns."""
     for table, expected in _EXPECTED_COLUMNS.items():
-        actual = _table_columns(conn, table)
-        if not actual:
-            return False  # table doesn't exist yet
-        if not expected.issubset(actual):
-            return False  # missing one or more columns
+        if not expected.issubset(_table_columns(conn, table)):
+            return False
     return True
 
 
@@ -43,35 +75,17 @@ def init_db() -> None:
     """Initialise the database schema.
 
     Phase 1: no migration tooling. If the schema is out of date (missing
-    tables or columns), both tables are dropped and recreated. All data
-    is local and pre-production, so data loss during development is
-    acceptable — as agreed in Issue #3.
+    tables or columns), all tables are dropped and recreated from _SCHEMA.
+    Data loss is acceptable for local pre-production use — per Issue #3.
     """
     with get_connection() as conn:
         if not _schema_is_current(conn):
-            # Drop in reverse dependency order so FK constraints don't block
-            conn.execute("DROP TABLE IF EXISTS transactions")
-            conn.execute("DROP TABLE IF EXISTS import_batches")
+            for table, _ in reversed(_SCHEMA):
+                conn.execute(f"DROP TABLE IF EXISTS {table}")
 
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS import_batches (
-                id           INTEGER PRIMARY KEY AUTOINCREMENT,
-                imported_at  TEXT NOT NULL DEFAULT (datetime('now')),
-                row_count    INTEGER NOT NULL,
-                skipped      INTEGER NOT NULL DEFAULT 0
-            )
-        """)
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS transactions (
-                id           INTEGER PRIMARY KEY AUTOINCREMENT,
-                date         TEXT NOT NULL,
-                description  TEXT NOT NULL,
-                amount       REAL NOT NULL,
-                balance      REAL,
-                label_broad  TEXT,
-                fingerprint  TEXT,
-                batch_id     INTEGER REFERENCES import_batches(id),
-                imported_at  TEXT NOT NULL DEFAULT (datetime('now'))
-            )
-        """)
+        for _, create_sql in _SCHEMA:
+            # _SCHEMA entries use CREATE TABLE; add IF NOT EXISTS for idempotency
+            sql = create_sql.strip().replace("CREATE TABLE ", "CREATE TABLE IF NOT EXISTS ", 1)
+            conn.execute(sql)
+
         conn.commit()
