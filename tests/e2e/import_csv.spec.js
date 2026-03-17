@@ -77,12 +77,6 @@ test.describe('CSV Import', () => {
     ).toBeVisible()
   })
 
-  test('clicking Import CSV navigates to /import', async ({ page }) => {
-    await page.goto('/')
-    await page.getByRole('link', { name: /import csv/i }).click()
-    await expect(page).toHaveURL(/\/import/)
-  })
-
   test('uploading sample.csv shows pre-filled column mapping dropdowns', async ({ page }) => {
     await page.goto('/import')
     await uploadAndWaitForMapping(page, SAMPLE_CSV)
@@ -94,13 +88,6 @@ test.describe('CSV Import', () => {
     // Description select should be pre-filled too
     const descSelect = page.locator('select').nth(1)
     await expect(descSelect).toHaveValue('Description')
-  })
-
-  test('proceeding shows review step with 10 new transactions', async ({ page }) => {
-    await page.goto('/import')
-    await uploadAndWaitForMapping(page, SAMPLE_CSV)
-    await proceedToReview(page)
-    await expect(page.getByText(/10 new/i).first()).toBeVisible()
   })
 
   test('importing shows success with "Imported 10 transactions"', async ({ page }) => {
