@@ -96,6 +96,45 @@ tests/e2e/import_csv.spec.js
 
 ---
 
+## Feature #3: Transaction Labelling — agreed decisions
+
+### Storage: join table (Option B chosen over hardcoded columns or JSON blob)
+- New table `transaction_labels`: `(transaction_id, layer_id, category_id)`
+- `PRIMARY KEY (transaction_id, layer_id)` — one label per layer per transaction
+- `transactions.label_broad TEXT` column **REMOVED** — replaced entirely by join table
+- Schema handled by drop+recreate (same as existing behaviour — data loss acceptable in phase 1)
+- Adding a new layer in future = add YAML entry only. No schema change, no API change.
+
+### API shape (layer-generic by design)
+- `PATCH /api/transactions/{id}/labels`
+  - Body: `{ "layer": "broad", "category": "groceries" }` — upserts label
+  - Body: `{ "layer": "broad", "category": null }` — clears label (deletes row)
+  - 404 if transaction not found; 422 for invalid layer or category ID
+- `GET /api/transactions` — each tx gets `"labels": { "broad": "groceries" }` (empty dict `{}` if none)
+- Validation: `layer` must exist in `config/categories.yaml`; `category` must exist in that layer
+
+### Frontend approach
+- `LabelPicker.jsx` (new component) — generic select driven by `/api/categories`
+- `TransactionList.jsx` — fetches categories once on mount; passes `labels.broad` to LabelPicker
+- On PATCH success: update state. On failure: revert dropdown + show inline error.
+
+### Files
+```
+server/db.py                          ← update _SCHEMA + _EXPECTED_COLUMNS
+server/routes/transactions.py         ← update GET (LEFT JOIN pivot) + add PATCH endpoint
+src/components/TransactionList.jsx    ← read labels.broad not label_broad
+src/components/LabelPicker.jsx        ← new component
+tests/test_labels.py                  ← pytest: CRUD + validation
+tests/e2e/labelling.spec.js           ← playwright: assign label, persist on reload
+```
+
+### Impact on existing tests
+- `test_transactions_list.py` — currently asserts `label_broad` in response keys; update to `labels` dict
+- `test_import_confirm.py` — asserts `label_broad is None`; update to check `labels == {}`
+- `test_db.py` — asserts `label_broad` in expected columns; update to `transaction_labels` table
+
+---
+
 ## Tech stack reminders
 
 - Python: snake_case, f-strings, type hints, docstrings, pure functions preferred
