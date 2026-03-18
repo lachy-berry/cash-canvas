@@ -1,9 +1,6 @@
 // @ts-check
 /**
- * E2E tests for Feature #3: Transaction Labelling
- *
- * These tests are written BEFORE any implementation exists (ATDD step 2).
- * All tests are expected to FAIL until the feature is built.
+ * E2E acceptance tests for Feature #3: Transaction Labelling
  *
  * User journey:
  *  1. Import transactions

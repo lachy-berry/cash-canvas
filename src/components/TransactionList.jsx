@@ -29,8 +29,7 @@ export function TransactionList({ refreshKey = 0 }) {
         setBroadCategories(broad?.categories ?? [])
       })
       .catch(() => {
-        // Non-fatal — pickers will render with no options; labelling still works
-        // once categories load on retry
+        // Non-fatal — pickers will render with no options until the page is reloaded.
       })
   }, [])
 

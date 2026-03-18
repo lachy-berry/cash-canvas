@@ -6,11 +6,26 @@ from fastapi import HTTPException
 
 _CATEGORIES_PATH = Path(__file__).parent.parent / "config" / "categories.yaml"
 
+# Simple in-process cache — invalidated whenever the file's mtime changes.
+# This means local edits to categories.yaml take effect immediately without
+# restarting the server.
+_CATEGORIES_CACHE: dict | None = None
+_CATEGORIES_MTIME: float | None = None
+
 
 def load_categories() -> dict:
-    """Load categories from the YAML config file."""
+    """Load categories from YAML with simple mtime-based in-process caching."""
+    global _CATEGORIES_CACHE, _CATEGORIES_MTIME
+    mtime = _CATEGORIES_PATH.stat().st_mtime
+    if _CATEGORIES_CACHE is not None and _CATEGORIES_MTIME == mtime:
+        return _CATEGORIES_CACHE
+
     with open(_CATEGORIES_PATH) as f:
-        return yaml.safe_load(f)
+        data = yaml.safe_load(f)
+
+    _CATEGORIES_CACHE = data
+    _CATEGORIES_MTIME = mtime
+    return data
 
 
 def validate_category(layer_id: str, category_id: str | None) -> None:
