@@ -1,5 +1,6 @@
 """Shared fixtures and helpers for all pytest tests."""
 import io
+import sqlite3
 from pathlib import Path
 
 import pytest
@@ -49,7 +50,12 @@ def make_row(**overrides):
 
 def _wipe_db():
     with get_connection() as conn:
-        conn.execute("DELETE FROM transaction_labels")
+        # Feature #3 introduces transaction_labels. During the ATDD red phase,
+        # this table may not exist yet — gracefully skip if so.
+        try:
+            conn.execute("DELETE FROM transaction_labels")
+        except sqlite3.OperationalError:
+            pass
         conn.execute("DELETE FROM transactions")
         conn.execute("DELETE FROM import_batches")
         conn.commit()
@@ -57,7 +63,7 @@ def _wipe_db():
 
 @pytest.fixture(autouse=True)
 def clean_db():
-    """Wipe transactions and import_batches before and after each test."""
+    """Wipe all tables before and after each test."""
     _wipe_db()
     yield
     _wipe_db()

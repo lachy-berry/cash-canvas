@@ -3,8 +3,6 @@
 These tests are written BEFORE any implementation exists (ATDD step 2).
 All tests are expected to FAIL until the feature is built.
 """
-import pytest
-
 from server.db import get_connection
 from tests.conftest import client, make_row, post_confirm
 
@@ -20,17 +18,23 @@ def _seed_one_transaction() -> int:
     return row["id"]
 
 
+def _set_label(tx_id: int, category: str | None, layer: str = "broad") -> None:
+    """PATCH a label and assert the response is 200 before continuing."""
+    resp = client.patch(
+        f"/api/transactions/{tx_id}/labels",
+        json={"layer": layer, "category": category},
+    )
+    assert resp.status_code == 200, (
+        f"Expected 200 from PATCH /api/transactions/{tx_id}/labels, got {resp.status_code}: {resp.text}"
+    )
+
+
 class TestLabelSet:
     def test_set_broad_label_returns_200_and_is_persisted(self):
         """Setting a valid broad label must return 200 and persist in the DB."""
         tx_id = _seed_one_transaction()
-        resp = client.patch(
-            f"/api/transactions/{tx_id}/labels",
-            json={"layer": "broad", "category": "groceries"},
-        )
-        assert resp.status_code == 200
+        _set_label(tx_id, "groceries")
 
-        # Verify label is persisted in the join table
         with get_connection() as conn:
             row = conn.execute(
                 "SELECT category_id FROM transaction_labels "
@@ -43,10 +47,8 @@ class TestLabelSet:
     def test_set_label_reflected_in_transaction_list(self):
         """After setting a label, GET /api/transactions must return it under labels.broad."""
         tx_id = _seed_one_transaction()
-        client.patch(
-            f"/api/transactions/{tx_id}/labels",
-            json={"layer": "broad", "category": "dining"},
-        )
+        _set_label(tx_id, "dining")
+
         data = client.get("/api/transactions").json()
         tx = next(t for t in data["transactions"] if t["id"] == tx_id)
         assert tx["labels"]["broad"] == "dining"
@@ -54,14 +56,9 @@ class TestLabelSet:
     def test_upsert_overwrites_existing_label(self):
         """PATCHing a second time replaces the first label — not duplicates it."""
         tx_id = _seed_one_transaction()
-        client.patch(
-            f"/api/transactions/{tx_id}/labels",
-            json={"layer": "broad", "category": "groceries"},
-        )
-        client.patch(
-            f"/api/transactions/{tx_id}/labels",
-            json={"layer": "broad", "category": "transport"},
-        )
+        _set_label(tx_id, "groceries")
+        _set_label(tx_id, "transport")
+
         with get_connection() as conn:
             rows = conn.execute(
                 "SELECT category_id FROM transaction_labels "
@@ -76,15 +73,8 @@ class TestLabelClear:
     def test_clear_label_with_null_category_removes_row(self):
         """Sending category=null must delete the label row from the join table."""
         tx_id = _seed_one_transaction()
-        client.patch(
-            f"/api/transactions/{tx_id}/labels",
-            json={"layer": "broad", "category": "groceries"},
-        )
-        resp = client.patch(
-            f"/api/transactions/{tx_id}/labels",
-            json={"layer": "broad", "category": None},
-        )
-        assert resp.status_code == 200
+        _set_label(tx_id, "groceries")
+        _set_label(tx_id, None)
 
         with get_connection() as conn:
             row = conn.execute(
@@ -96,14 +86,9 @@ class TestLabelClear:
     def test_clear_label_reflected_in_transaction_list(self):
         """After clearing, GET /api/transactions must return labels as empty dict."""
         tx_id = _seed_one_transaction()
-        client.patch(
-            f"/api/transactions/{tx_id}/labels",
-            json={"layer": "broad", "category": "groceries"},
-        )
-        client.patch(
-            f"/api/transactions/{tx_id}/labels",
-            json={"layer": "broad", "category": None},
-        )
+        _set_label(tx_id, "groceries")
+        _set_label(tx_id, None)
+
         data = client.get("/api/transactions").json()
         tx = next(t for t in data["transactions"] if t["id"] == tx_id)
         assert tx["labels"] == {}
@@ -111,11 +96,7 @@ class TestLabelClear:
     def test_clear_nonexistent_label_is_idempotent(self):
         """Sending category=null when no label exists must still return 200."""
         tx_id = _seed_one_transaction()
-        resp = client.patch(
-            f"/api/transactions/{tx_id}/labels",
-            json={"layer": "broad", "category": None},
-        )
-        assert resp.status_code == 200
+        _set_label(tx_id, None)  # no prior label — must not error
 
 
 class TestLabelValidation:
