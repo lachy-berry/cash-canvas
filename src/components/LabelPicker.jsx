@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 /**
  * LabelPicker — category dropdown for a single transaction row.
@@ -9,6 +9,11 @@ export function LabelPicker({ txId, layerId, currentValue, categories }) {
   const [value, setValue] = useState(currentValue ?? '')
   const [error, setError] = useState(null)
   const [saving, setSaving] = useState(false)
+
+  // Sync local state when the prop changes (e.g. parent reloads transaction data).
+  useEffect(() => {
+    setValue(currentValue ?? '')
+  }, [currentValue])
 
   async function handleChange(e) {
     const next = e.target.value

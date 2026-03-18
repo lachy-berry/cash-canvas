@@ -1,13 +1,40 @@
 """Transaction list and label endpoints."""
+import sqlite3
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
-from server.categories import load_categories
+from server.categories import validate_category
 from server.db import get_connection
 
 router = APIRouter()
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _load_labels_for_transactions(
+    conn: sqlite3.Connection, tx_ids: list[int]
+) -> dict[int, dict[str, str]]:
+    """Return a mapping of transaction_id → {layer_id: category_id} for the given ids.
+
+    Issues a single query regardless of page size. Returns an empty dict for
+    transactions that have no labels.
+    """
+    if not tx_ids:
+        return {}
+    placeholders = ",".join("?" * len(tx_ids))
+    rows = conn.execute(
+        f"SELECT transaction_id, layer_id, category_id "
+        f"FROM transaction_labels WHERE transaction_id IN ({placeholders})",
+        tx_ids,
+    ).fetchall()
+    result: dict[int, dict[str, str]] = {}
+    for row in rows:
+        result.setdefault(row["transaction_id"], {})[row["layer_id"]] = row["category_id"]
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -36,22 +63,8 @@ def list_transactions(
             (limit, offset),
         ).fetchall()
 
-        # Fetch all labels for the returned page in one query
-        if rows:
-            tx_ids = [r["id"] for r in rows]
-            placeholders = ",".join("?" * len(tx_ids))
-            label_rows = conn.execute(
-                f"SELECT transaction_id, layer_id, category_id "
-                f"FROM transaction_labels WHERE transaction_id IN ({placeholders})",
-                tx_ids,
-            ).fetchall()
-        else:
-            label_rows = []
-
-    # Build labels dict per transaction
-    labels_by_tx: dict[int, dict[str, str]] = {}
-    for lr in label_rows:
-        labels_by_tx.setdefault(lr["transaction_id"], {})[lr["layer_id"]] = lr["category_id"]
+        tx_ids = [r["id"] for r in rows]
+        labels_by_tx = _load_labels_for_transactions(conn, tx_ids)
 
     transactions = [
         {**dict(row), "labels": labels_by_tx.get(row["id"], {})}
@@ -79,41 +92,20 @@ def set_label(tx_id: int, body: LabelRequest) -> dict:
     Returns 404 if the transaction doesn't exist.
     Returns 422 if the layer or category is not in categories.yaml.
     """
-    # Validate layer and category against the YAML config
-    config = load_categories()
-    layers = {layer["id"]: layer for layer in config.get("layers", [])}
-
-    if body.layer not in layers:
-        raise HTTPException(
-            status_code=422,
-            detail=f"Unknown layer '{body.layer}'. Valid layers: {list(layers)}",
-        )
-
-    if body.category is not None:
-        valid_categories = {c["id"] for c in layers[body.layer].get("categories", [])}
-        if body.category not in valid_categories:
-            raise HTTPException(
-                status_code=422,
-                detail=f"Unknown category '{body.category}' in layer '{body.layer}'. "
-                       f"Valid categories: {sorted(valid_categories)}",
-            )
+    validate_category(body.layer, body.category)
 
     with get_connection() as conn:
-        # Verify the transaction exists
-        exists = conn.execute(
+        if not conn.execute(
             "SELECT 1 FROM transactions WHERE id=?", (tx_id,)
-        ).fetchone()
-        if not exists:
+        ).fetchone():
             raise HTTPException(status_code=404, detail=f"Transaction {tx_id} not found.")
 
         if body.category is None:
-            # Clear: delete the label row if it exists
             conn.execute(
                 "DELETE FROM transaction_labels WHERE transaction_id=? AND layer_id=?",
                 (tx_id, body.layer),
             )
         else:
-            # Upsert: INSERT OR REPLACE handles both insert and overwrite
             conn.execute(
                 """
                 INSERT INTO transaction_labels (transaction_id, layer_id, category_id)

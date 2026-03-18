@@ -39,6 +39,7 @@ export function TransactionList({ refreshKey = 0 }) {
 
     async function loadTransactions() {
       setLoading(true)
+      setError(null)
       try {
         const res = await fetch(`/api/transactions?limit=${PAGE_SIZE}&offset=${offset}`)
         if (!res.ok) throw new Error(`Server error ${res.status}`)
