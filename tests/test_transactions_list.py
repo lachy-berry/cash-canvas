@@ -17,7 +17,7 @@ class TestTransactionsList:
         assert data["total"] == 3
         dates = [t["date"] for t in data["transactions"]]
         assert dates == sorted(dates, reverse=True)
-        assert {"id", "date", "description", "amount", "balance", "label_broad"}.issubset(data["transactions"][0])
+        assert {"id", "date", "description", "amount", "balance", "labels"}.issubset(data["transactions"][0])
 
     def test_empty_before_import(self):
         data = client.get("/api/transactions").json()

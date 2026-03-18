@@ -25,7 +25,12 @@ class TestConfirm:
             ).fetchone()
         assert row["date"] == "2026-03-01"
         assert row["amount"] == pytest.approx(-82.50)
-        assert row["label_broad"] is None
+        # label_broad column removed — labels stored in transaction_labels join table
+        with get_connection() as conn:
+            label_row = conn.execute(
+                "SELECT 1 FROM transaction_labels WHERE transaction_id=?", (row["id"],)
+            ).fetchone()
+        assert label_row is None
         assert row["batch_id"] == data["batch_id"]
 
     def test_fingerprint_computed_server_side(self):

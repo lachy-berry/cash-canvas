@@ -27,6 +27,8 @@ STALE_SCHEMA = """
         imported_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 """
+# NOTE: stale schema has label_broad (old) and is missing transaction_labels table.
+# init_db() must detect this as stale and recreate from _SCHEMA.
 
 
 def _make_stale_db(path: str) -> None:
@@ -36,7 +38,10 @@ def _make_stale_db(path: str) -> None:
 
 class TestInitDb:
     def test_all_expected_columns_present_after_init(self, tmp_path, monkeypatch):
-        """init_db() must create both tables with all required columns."""
+        """init_db() must create all tables with all required columns.
+
+        label_broad must NOT appear — it is replaced by the transaction_labels table.
+        """
         db_file = str(tmp_path / "test.db")
         monkeypatch.setattr("server.db._DB_PATH", Path(db_file))
         init_db()
@@ -44,9 +49,13 @@ class TestInitDb:
             assert {"id", "imported_at", "row_count", "skipped"}.issubset(
                 _table_columns(conn, "import_batches")
             )
+            tx_cols = _table_columns(conn, "transactions")
             assert {"id", "date", "description", "amount", "balance",
-                    "label_broad", "fingerprint", "batch_id", "imported_at"}.issubset(
-                _table_columns(conn, "transactions")
+                    "fingerprint", "batch_id", "imported_at"}.issubset(tx_cols)
+            assert "label_broad" not in tx_cols
+            # transaction_labels join table must exist
+            assert {"transaction_id", "layer_id", "category_id"}.issubset(
+                _table_columns(conn, "transaction_labels")
             )
 
 

@@ -49,6 +49,7 @@ def make_row(**overrides):
 
 def _wipe_db():
     with get_connection() as conn:
+        conn.execute("DELETE FROM transaction_labels")
         conn.execute("DELETE FROM transactions")
         conn.execute("DELETE FROM import_batches")
         conn.commit()
