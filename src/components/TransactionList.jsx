@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
+import { LabelPicker } from './LabelPicker'
 
 const PAGE_SIZE = 50
 
 /**
- * TransactionList — paginated read-only table of imported transactions.
+ * TransactionList — paginated table of imported transactions with inline labelling.
  *
  * @param {{ refreshKey: number }} props
  *   Increment refreshKey from the parent to trigger a reload.
@@ -15,13 +16,29 @@ export function TransactionList({ refreshKey = 0 }) {
   const [page, setPage] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [broadCategories, setBroadCategories] = useState([])
 
   const offset = page * PAGE_SIZE
+
+  // Fetch broad categories once on mount — sourced from /api/categories → YAML
+  useEffect(() => {
+    fetch('/api/categories')
+      .then(res => res.ok ? res.json() : Promise.reject(res.status))
+      .then(data => {
+        const broad = data.layers?.find(l => l.id === 'broad')
+        setBroadCategories(broad?.categories ?? [])
+      })
+      .catch(() => {
+        // Non-fatal — pickers will render with no options until the page is reloaded.
+      })
+  }, [])
 
   useEffect(() => {
     let cancelled = false
 
     async function loadTransactions() {
+      setLoading(true)
+      setError(null)
       try {
         const res = await fetch(`/api/transactions?limit=${PAGE_SIZE}&offset=${offset}`)
         if (!res.ok) throw new Error(`Server error ${res.status}`)
@@ -82,7 +99,14 @@ export function TransactionList({ refreshKey = 0 }) {
                 <td className="px-4 py-3 text-right tabular-nums text-gray-400">
                   {tx.balance != null ? `$${tx.balance.toFixed(2)}` : '—'}
                 </td>
-                <td className="px-4 py-3 text-gray-400 text-xs">{tx.label_broad ?? '—'}</td>
+                <td className="px-4 py-3">
+                  <LabelPicker
+                    txId={tx.id}
+                    layerId="broad"
+                    currentValue={tx.labels?.broad ?? null}
+                    categories={broadCategories}
+                  />
+                </td>
               </tr>
             ))}
           </tbody>

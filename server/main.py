@@ -41,6 +41,7 @@ def test_reset() -> dict:
     if os.environ.get("CASH_CANVAS_TEST_MODE") != "1":
         raise HTTPException(status_code=403, detail="Test reset is not enabled.")
     with get_connection() as conn:
+        conn.execute("DELETE FROM transaction_labels")
         conn.execute("DELETE FROM transactions")
         conn.execute("DELETE FROM import_batches")
         conn.commit()

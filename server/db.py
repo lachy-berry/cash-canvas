@@ -6,7 +6,8 @@ _DB_PATH = Path(__file__).parent.parent / "data" / "cash_canvas.db"
 
 # ---------------------------------------------------------------------------
 # Single source of truth for the schema.
-# Order matters: import_batches must precede transactions (FK dependency).
+# Order matters: import_batches must precede transactions (FK dependency),
+# and transactions must precede transaction_labels (FK dependency).
 # ---------------------------------------------------------------------------
 _SCHEMA: list[tuple[str, str]] = [
     (
@@ -29,10 +30,20 @@ _SCHEMA: list[tuple[str, str]] = [
             description  TEXT NOT NULL,
             amount       REAL NOT NULL,
             balance      REAL,
-            label_broad  TEXT,
             fingerprint  TEXT,
             batch_id     INTEGER REFERENCES import_batches(id),
             imported_at  TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+        """,
+    ),
+    (
+        "transaction_labels",
+        """
+        CREATE TABLE transaction_labels (
+            transaction_id  INTEGER NOT NULL REFERENCES transactions(id),
+            layer_id        TEXT    NOT NULL,
+            category_id     TEXT    NOT NULL,
+            PRIMARY KEY (transaction_id, layer_id)
         )
         """,
     ),
@@ -44,8 +55,9 @@ _EXPECTED_COLUMNS: dict[str, set[str]] = {
     "import_batches": {"id", "imported_at", "row_count", "skipped"},
     "transactions": {
         "id", "date", "description", "amount", "balance",
-        "label_broad", "fingerprint", "batch_id", "imported_at",
+        "fingerprint", "batch_id", "imported_at",
     },
+    "transaction_labels": {"transaction_id", "layer_id", "category_id"},
 }
 
 
